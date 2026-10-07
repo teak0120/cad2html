@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<style>
+html,body{margin:0;height:100%;font:13px system-ui,sans-serif;background:#1e1e1e;color:#ddd;overflow:hidden}
+#c{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#bar{position:absolute;top:8px;left:8px;display:flex;gap:6px;z-index:2}
+button{background:#333;color:#ddd;border:1px solid #555;border-radius:4px;padding:5px 9px;cursor:pointer}
+button:hover{background:#444}
+#panel{position:absolute;top:44px;left:8px;max-height:70%;overflow:auto;background:#2a2a2add;border:1px solid #555;border-radius:4px;padding:6px;display:none;z-index:2}
+#panel label{display:flex;align-items:center;gap:6px;padding:2px 4px;white-space:nowrap}
+#panel i{width:12px;height:12px;display:inline-block;border:1px solid #888}
+#st{position:absolute;bottom:6px;left:8px;opacity:.8;z-index:2}
+body.light{background:#fff;color:#222}body.light button{background:#eee;color:#222;border-color:#bbb}
+body.light #panel{background:#f4f4f4ee;border-color:#bbb}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="bar"><button id="fit">全体表示</button><button id="lay">レイヤー</button><button id="th">明/暗</button></div>
+<div id="panel"></div><div id="st"></div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('data').textContent);
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),st=document.getElementById('st');
+const vis={};D.layers.forEach(l=>vis[l.n]=true);
+let light=false,s=1,ox=0,oy=0,dpr=window.devicePixelRatio||1;
+const fg=()=>light?'#000':'#fff';
+function resize(){cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;draw()}
+function fit(){const b=D.bbox,w=b[2]-b[0]||1,h=b[3]-b[1]||1,m=0.92;
+ s=Math.min(innerWidth/w,innerHeight/h)*m;
+ ox=innerWidth/2-(b[0]+b[2])/2*s;oy=innerHeight/2+(b[1]+b[3])/2*s;draw()}
+const X=x=>x*s+ox,Y=y=>oy-y*s;
+function draw(){
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.fillStyle=light?'#fff':'#1e1e1e';ctx.fillRect(0,0,innerWidth,innerHeight);
+ ctx.lineWidth=1;ctx.lineJoin='round';
+ const vx0=-ox/s,vx1=(innerWidth-ox)/s,vy0=(oy-innerHeight)/s,vy1=oy/s;
+ let last=null;ctx.beginPath();
+ const flush=()=>{if(last!==null){ctx.strokeStyle=last;ctx.stroke();ctx.beginPath()}};
+ for(const p of D.polys){
+  if(!vis[p.l])continue;
+  const c=p.c||fg();
+  if(c!==last){flush();last=c}
+  const a=p.p;
+  if(p.pt){ctx.rect(X(a[0][0])-1,Y(a[0][1])-1,2,2);continue}
+  ctx.moveTo(X(a[0][0]),Y(a[0][1]));
+  for(let i=1;i<a.length;i++)ctx.lineTo(X(a[i][0]),Y(a[i][1]));
+  if(p.z)ctx.closePath();
+ }
+ flush();
+ for(const t of D.texts){
+  if(!vis[t.l])continue;
+  const px=t.h*s;if(px<4)continue;
+  const x=t.x,y=t.y;if(x<vx0||x>vx1||y<vy0||y>vy1)continue;
+  ctx.save();ctx.translate(X(x),Y(y));ctx.rotate(-t.r*Math.PI/180);
+  ctx.fillStyle=t.c||fg();ctx.font=px+'px sans-serif';
+  t.t.split('\n').forEach((ln,i)=>ctx.fillText(ln,0,i*px*1.3));ctx.restore();
+ }
+}
+let drag=null,pts=new Map(),pd=0;
+cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,e);drag={x:e.clientX,y:e.clientY};pd=0};
+cv.onpointermove=e=>{
+ const wx=(e.clientX-ox)/s,wy=(oy-e.clientY)/s;st.textContent='X: '+wx.toFixed(2)+'  Y: '+wy.toFixed(2);
+ if(!pts.has(e.pointerId))return;
+ pts.set(e.pointerId,e);
+ if(pts.size==2){const [a,b]=[...pts.values()],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+  if(pd)zoom(d/pd,(a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2);pd=d;return}
+ ox+=e.clientX-drag.x;oy+=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};draw()};
+cv.onpointerup=cv.onpointercancel=e=>{pts.delete(e.pointerId);drag=pts.size?drag:null;pd=0};
+function zoom(f,cx,cy){ox=cx-(cx-ox)*f;oy=cy-(cy-oy)*f;s*=f;draw()}
+cv.onwheel=e=>{e.preventDefault();zoom(Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY)};
+document.getElementById('fit').onclick=fit;
+document.getElementById('th').onclick=()=>{light=!light;document.body.classList.toggle('light',light);build();draw()};
+const pn=document.getElementById('panel');
+document.getElementById('lay').onclick=()=>pn.style.display=pn.style.display=='block'?'none':'block';
+function build(){pn.innerHTML='';D.layers.forEach(l=>{const lb=document.createElement('label'),cb=document.createElement('input');
+ cb.type='checkbox';cb.checked=vis[l.n];cb.onchange=()=>{vis[l.n]=cb.checked;draw()};
+ const sw=document.createElement('i');sw.style.background=l.c||fg();
+ lb.append(cb,sw,document.createTextNode(l.n));pn.append(lb)})}
+build();addEventListener('resize',resize);resize();fit();
+</script></body></html>
