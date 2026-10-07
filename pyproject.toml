@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cad2html"
+version = "0.1.0"
+description = "Convert DWG/DXF to a self-contained offline HTML viewer"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["ezdxf>=1.0"]
+
+[project.scripts]
+cad2html = "cad2html.cli:main"
+
+[tool.setuptools]
+packages = ["cad2html"]
+
+[tool.setuptools.package-data]
+cad2html = ["viewer.html"]

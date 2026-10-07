@@ -4,8 +4,8 @@ DWG/DXF を、オフラインで開ける**自己完結型HTML**(外部ライブ
 
 ## 使い方
 ```
-pip install ezdxf
-python -m cad2html drawing.dxf            # -> drawing.html
+pip install .          # または: pip install ezdxf (インストール不要で python -m cad2html でも可)
+cad2html drawing.dxf                   # -> drawing.html (python -m cad2html でも可)
 python -m cad2html a.dxf b.dwg            # 複数一括
 python -m cad2html drawing.dxf -o out.html
 ```
