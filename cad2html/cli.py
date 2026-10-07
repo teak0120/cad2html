@@ -2,20 +2,14 @@
 import argparse, json, os, shutil, subprocess, sys, tempfile, html
 from pathlib import Path
 from .extract import extract
+from .installer import ensure_dwg2dxf
 
 TEMPLATE = Path(__file__).with_name("viewer.html")
 
 
 def dwg_to_dxf(src, outdir):
-    """外部コンバータでDWGをDXFに変換する (ODA File Converter / LibreDWG)。"""
+    """DWGをDXFに変換する。ODA File Converter があれば優先、無ければ LibreDWG (自動導入)。"""
     src = Path(src).resolve()
-    exe = shutil.which("dwg2dxf")
-    if exe:
-        out = Path(outdir) / (src.stem + ".dxf")
-        subprocess.run([exe, "-y", "-o", str(out), str(src)], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if out.exists():
-            return out
     for name in ("ODAFileConverter", "ODAFileConverter.AppImage"):
         exe = shutil.which(name)
         if exe:
@@ -26,8 +20,31 @@ def dwg_to_dxf(src, outdir):
             out = Path(outdir) / (src.stem + ".dxf")
             if out.exists():
                 return out
-    raise SystemExit("DWGの読み込みには LibreDWG の dwg2dxf か ODA File Converter が必要です。\n"
-                     "インストールするか、CADソフトでDXFに保存してから指定してください。")
+    try:
+        exe = ensure_dwg2dxf()
+    except RuntimeError as e:
+        raise SystemExit(str(e))
+    out = Path(outdir) / (src.stem + ".dxf")
+    # dwg2dxf は警告で非0終了しても出力する場合があるため、出力有無で判定する
+    subprocess.run([exe, "-y", "-o", str(out), str(src)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not out.exists() or out.stat().st_size == 0:
+        raise SystemExit("DWGの変換に失敗しました (未対応バージョンの可能性): %s" % src)
+    _sanitize_dxf(out)
+    return out
+
+
+def _sanitize_dxf(path):
+    """dwg2dxf が出力する不正なハンドル(5/105 = 0)の組を取り除く。ezdxf が新規採番する。"""
+    raw = Path(path).read_bytes()
+    nl = b"\r\n" if b"\r\n" in raw[:4096] else b"\n"
+    lines = raw.split(nl)
+    out, i, n = [], 0, len(lines)
+    while i < n:
+        if i + 1 < n and lines[i].strip() in (b"5", b"105") and lines[i + 1].strip() in (b"0", b"00"):
+            i += 2
+            continue
+        out.append(lines[i]); i += 1
+    Path(path).write_bytes(nl.join(out))
 
 
 def convert(src, dst=None):

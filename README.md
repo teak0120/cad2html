@@ -10,7 +10,7 @@ python -m cad2html a.dxf b.dwg            # 複数一括
 python -m cad2html drawing.dxf -o out.html
 ```
 - DXF: そのまま変換できます。
-- DWG: 外部コンバータが必要です(`dwg2dxf` (LibreDWG) または ODA File Converter がPATHにあれば自動利用)。無い場合はDXFで保存してください。
+- DWG: 変換に必要な `dwg2dxf` (LibreDWG) が無ければ**初回に自動でインストール**します(キャッシュ `~/.cache/cad2html` に保存、2回目以降は再利用)。Windows は公式バイナリをダウンロード、Linux/macOS はソースをダウンロードしてビルドします(gcc と make が必要、数分かかります)。ODA File Converter がPATHにあればそちらを優先します。
 
 ## ビューアの機能
 ドラッグでパン / ホイール・ピンチでズーム / 全体表示 / レイヤーON-OFF / 明暗切替 / 座標表示

@@ -1,9 +1,11 @@
 """DXF -> 軽量なジオメトリ辞書への変換 (ezdxf使用)。"""
+import logging
 import math
 import ezdxf
 from ezdxf import colors
 from ezdxf.path import make_path
 
+logging.getLogger('ezdxf').setLevel(logging.ERROR)
 FLATTEN_DIST = 0.01  # 相対精度は後でextentsに応じて調整
 
 
@@ -57,7 +59,11 @@ def _iter_nested(ins, depth):
 
 
 def extract(path):
-    doc = ezdxf.readfile(path)
+    try:
+        doc = ezdxf.readfile(path)
+    except Exception:
+        from ezdxf import recover  # 壊れ気味のDXF(DWG変換出力など)は復旧モードで読む
+        doc, _auditor = recover.readfile(path)
     msp = doc.modelspace()
 
     layers = {}
